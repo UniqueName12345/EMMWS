@@ -3,7 +3,7 @@
 
 # TODO: Implement this using actions
 cd $GITHUB_WORKSPACE
-git config user.name "mybearworld"
+git config user.name "mybearworld[bot]"
 git config user.email "mybearworld[bot]@users.noreply.github.com"
 echo "Committing..."
 git commit -am "Updated script(s)"
