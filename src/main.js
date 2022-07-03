@@ -1,3 +1,5 @@
+"use strict";
+
 const mmwsRegexNotInString     = (re) => new RegExp(`(?<!"(?:\\\\"|[^"])+)(?:${re.source})|(?:${re.source})(?=[^"]*$)`, Array.from(new Set("g", re.flags)).join(""));
 const mmwsRuleRegex            = /^[^ \n][^\n]*(?:\n {4}[^\n]*)(?:\n {4}[^\n]*|\n *)*/gm;
 const mmwsStatementRegex            = /^[^ \n][^\n]*$(?!\n {4})/gm;
@@ -62,7 +64,7 @@ function mmwsToCss(code) {
                 .map(s => s.trim().split(mmwsRuleSubComponent).map(s => s.trim()));
             i = 0;
             important = false;
-            lastVal = null;
+            lastValue = null;
             for (subc of rule) {
                 i++;
                 if (i === 1) {
