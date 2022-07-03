@@ -1,0 +1,14 @@
+name: fetch-from-source
+
+on:
+  schedule:
+    - cron: "*/300 * * * *"
+  workflow_dispatch:
+
+jobs:
+  SaveData:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - run: "python3 ./fetch.py"
+      - run: "bash commit.sh"
