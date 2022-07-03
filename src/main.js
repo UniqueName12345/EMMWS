@@ -1,8 +1,9 @@
+const mmwsRegexNotInString     = (re) => new RegExp(`(?<!"(?:\\\\"|[^"])+)(?:${re.source})|(?:${re.source})(?=[^"]*$)`, Array.from(new Set("g", re.flags)).join(""));
 const mmwsRuleRegex            = /^[^ \n][^\n]*(?:\n {4}[^\n]*)(?:\n {4}[^\n]*|\n *)*/gm;
 const mmwsStatementRegex            = /^[^ \n][^\n]*$(?!\n {4})/gm;
 const mmwsNameTokenRegex       = /(?::|#|\.|==?)[a-zA-Z\-_]+|(?:\+|>>?)|!\(|\)|"[^"]*"| +/gm;
 const mmwsReplacements         = [
-    [/(?<!"(?:\\"|[^"])+) +| +(?=[^"]*$)/g, ""], // whitespace
+    [mmwsRegexNotInString(/ +/), ""], // whitespace
     [/:([a-zA-Z\-_]+)/g, "$1"], // colons
     [/#([a-zA-Z\-_]+)/g, "#$1"], // ids
     [/\.([a-zA-Z\-_]+)/g, ".$1"], // classes
@@ -13,6 +14,7 @@ const mmwsReplacements         = [
     [/(.*)>(.*)/, "$1>$2"], // single gt
     [/(.*)>>(.*)/, "$1 $2"], // double gt
 ];
+const mmwsCommentRegex         = mmwsRegexNotInString(/\/\/.*?$|\/\*.*?\*\//sm);
 const mmwsRuleComponent        = /(?<!"(?:\\"|[^"])+);|;(?=[^"]*$)/g;
 const mmwsRuleSubComponent     = /(?<!"(?:\\"|[^"])+) +| +(?=[^"]*$)/g;
 const mmwsVariableRegex        = /\$([a-zA-Z\-_]*) +(.*)/g;
@@ -21,13 +23,15 @@ const mmwsError                = console.warn;
 
 function mmwsToCss(code) {
     let cssKey, cssObj, i, important,
-        key, match, order, propName, rep,
-        resultCSS, rule, rules, rulesObj,
-        statements, subc, varbl, vars;
+        lastValue, key, order, propName, 
+        rep, resultCSS, rule, rules,
+        rulesObj, selector, statements,
+        subc, vars;
 
     if (typeof code !== "string") {return;}
 
     // Get important parts from the code
+    code = code.replace(mmwsCommentRegex, "");
     rules = [...code.matchAll(mmwsRuleRegex)]
         .map(r => r.toString().trim().split("\n")
             .map(s => s.trim()));
@@ -58,6 +62,7 @@ function mmwsToCss(code) {
                 .map(s => s.trim().split(mmwsRuleSubComponent).map(s => s.trim()));
             i = 0;
             important = false;
+            lastVal = null;
             for (subc of rule) {
                 i++;
                 if (i === 1) {
@@ -68,14 +73,26 @@ function mmwsToCss(code) {
                     propName = subc[0];
                     subc = subc.splice(1);
                     subc = subc.map(s => s.replace(/\$([a-zA-Z\-_]+)/, "var(--$1)"));
-
-                    cssObj[cssKey].push(`${propName}:${subc.join(" ")}${important ? "!important" : ""};`);
+                    if (subc.length) {
+                        cssObj[cssKey].push(`${propName}:${subc.join(" ")}${important ? "!important" : ""};`);
+                        lastValue = subc;
+                    }
                 } else {
                     if (!order.includes(`${cssKey}:${subc[0]}`)) {
                         cssObj[`${cssKey}:${subc[0]}`] = [];
-                        order.push(`${cssKey}:${subc[0]}`)
+                        order.push(`${cssKey}:${subc[0]}`);
+                        selector = subc[0];
                     }
-                    cssObj[`${cssKey}:${subc[0]}`].push(`${propName}:${subc.splice(1).join(" ")}${important ? "!important" : ""};`);
+                    subc = subc.splice(1)
+                    if (subc.length) {
+                        cssObj[`${cssKey}:${selector}`].push(`${propName}:${subc.join(" ")}${important ? "!important" : ""};`);
+                        lastValue = subc;
+                    } else if (lastValue !== null) {
+                        cssObj[`${cssKey}:${selector}`].push(`${propName}:${lastValue.join("")}${important ? "!important" : ""};`);
+                    } else {
+                        mmwsError("Declerations can't be empty.");
+                        return;
+                    }
                 }
             }
         }
@@ -95,10 +112,12 @@ function mmwsToCss(code) {
     
 
     // Convert to CSS
-        resultCSS = "";
-        for (key of order) {
+    resultCSS = "";
+    for (key of order) {
+        if (cssObj[key].length) {
             resultCSS += `${key}{${cssObj[key].join("")}}`;
         }
+    }
 
     console.log(resultCSS);
 
