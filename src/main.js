@@ -1,5 +1,6 @@
 "use strict";
 
+
 const mmwsRegexNotInString     = (re) => new RegExp(`(?<!"(?:\\\\"|[^"])*)(?:${re.source})|(?:${re.source})(?=[^"]*$)`, Array.from(new Set("g", re.flags)).join(""));
 const mmwsRuleRegex            = /^[^ \n][^\n]*(?:\n {4}[^\n]*)(?:\n {4}[^\n]*|\n *)*/gm;
 const mmwsStatementRegex            = /^[^ \n][^\n]*$(?!\n {4})/gm;
@@ -155,6 +156,7 @@ async function mmwsConvertTagsToCSS() {
             response = await fetch(fileName);
             if (response.status === 404) {
                 mmwsError(`${fileName} does not exist.`);
+                continue;
             }
             mmwsCode = await response.text();
         }
