@@ -1,9 +1,8 @@
 "use strict";
 
-
-const mmwsRegexNotInString     = (re) => new RegExp(`(?<!"(?:\\\\"|[^"])+)(?:${re.source})|(?:${re.source})(?=[^"]*$)`, Array.from(new Set("g", re.flags)).join(""));
+const mmwsRegexNotInString     = (re) => new RegExp(`(?<!"(?:\\\\"|[^"])*)(?:${re.source})|(?:${re.source})(?=[^"]*$)`, Array.from(new Set("g", re.flags)).join(""));
 const mmwsRuleRegex            = /^[^ \n][^\n]*(?:\n {4}[^\n]*)(?:\n {4}[^\n]*|\n *)*/gm;
-const mmwsStatementRegex       = /^[^ \n][^\n]*$(?!\n {4})/gm;
+const mmwsStatementRegex            = /^[^ \n][^\n]*$(?!\n {4})/gm;
 const mmwsNameTokenRegex       = /(?::|#|\.|==?)[a-zA-Z\-_]+|(?:\+|>>?)|!\(|\)|"[^"]*"| +/gm;
 const mmwsReplacements         = [
     [mmwsRegexNotInString(/ +/), ""], // whitespace
@@ -22,6 +21,7 @@ const mmwsRuleComponent        = /(?<!"(?:\\"|[^"])+);|;(?=[^"]*$)/g;
 const mmwsRuleSubComponent     = /(?<!"(?:\\"|[^"])+) +| +(?=[^"]*$)/g;
 const mmwsVariableRegex        = /\$([a-zA-Z\-_]*) +(.*)/g;
 const mmwsError                = console.warn;
+var   mmwsCounter              = 0;
 
 
 function mmwsToCss(code) {
@@ -129,28 +129,45 @@ function mmwsToCss(code) {
 
 
 async function mmwsConvertTagsToCSS() {
-    let element, fileName, response, css, styleEl;
+    let element, fileName, mmwsCode,
+        response, css, styleEl;
 
     for (element of document.querySelectorAll("mmws")) {
-        fileName = element.getAttribute("src")
+        fileName = element.getAttribute("src");
         if (fileName === null) {
-            mmwsError("No file name was given on <mmws> tag.");
+            mmwsCode = element.innerHTML;
+            mmwsCode = mmwsCode.split("\n")
+                .filter(c => c.trim())
+                .join("\n");
+            mmwsCode = mmwsCode.split("\n")
+                .map(s => s.replace(
+                    new RegExp(
+                        `^ {${Math.min(...
+                            [...mmwsCode.matchAll(/^ */gm)]
+                                .map(e => e[0].length).filter(n => n)
+                            )}}`,
+                        "gm"
+                    ), "")
+                ).join("\n");
+            mmwsCounter++;
+            fileName = `inline-${mmwsCounter}`;
         } else {
             response = await fetch(fileName);
             if (response.status === 404) {
                 mmwsError(`${fileName} does not exist.`);
-            } else {
-                css = mmwsToCss(await response.text());
-                if (css !== null) {
-                    styleEl = document.createElement("style");
-                    styleEl.classList.add("-mmws-converted");
-                    styleEl.id = `--mmws-from-${fileName.replace(/[^A-Z0-9-]/ig, "-")}`;
-                    styleEl.innerHTML = css;
-                    document.head.appendChild(styleEl);
-                }
             }
+            mmwsCode = await response.text();
         }
-        element.remove();
+        console.log(mmwsCode)
+        css = mmwsToCss(mmwsCode);
+        if (css !== null) {
+            styleEl = document.createElement("style");
+            styleEl.classList.add("-mmws-converted");
+            styleEl.id = `--mmws-from-${fileName.replace(/[^A-Z0-9-]/ig, "-")}`;
+            styleEl.innerHTML = css;
+            document.head.appendChild(styleEl);
+        }
+    element.remove();
     }
 }
 
