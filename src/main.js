@@ -1,21 +1,21 @@
 "use strict";
 
 
-const mmwsRegexNotInString     = (re) => new RegExp(`(?<!"(?:\\\\"|[^"])*)(?:${re.source})|(?:${re.source})(?=[^"]*$)`, Array.from(new Set("g", re.flags)).join(""));
+const mmwsRegexNotInString     = re => new RegExp(`(?<!"(?:\\\\"|[^"])*)(?:${re.source})|(?:${re.source})(?=[^"]*$)`, [...new Set(["g", ...re.flags])].join(""));
 const mmwsRuleRegex            = /^[^ \n][^\n]*(?:\n {4}[^\n]*)(?:\n {4}[^\n]*|\n *)*/gm;
 const mmwsStatementRegex       = /^[^ \n][^\n]*$(?!\n {4})/gm;
 const mmwsNameTokenRegex       = /(?::|#|\.|==?)[a-zA-Z\-_]+|(?:\+|>>?)|!\(|\)|"[^"]*"| +/gm;
 const mmwsReplacements         = [
     [mmwsRegexNotInString(/ +/), ""], // whitespace
+    [/([:#\.][a-zA-Z\-_]+)\+([:#\.][a-zA-Z\-_]+)/, "$1$2"], // plus
+    [/([:#\.][a-zA-Z\-_]+)>([:#\.][a-zA-Z\-_]+)/, "$1>$2"], // single gt
+    [/([:#\.][a-zA-Z\-_]+)>>([:#\.][a-zA-Z\-_]+)/, "$1 $2"], // double gt
+    [/!\(([:#\.][a-zA-Z\-_]+)\)/g, ":not($1)"], // not
     [/:([a-zA-Z\-_]+)/g, "$1"], // colons
     [/#([a-zA-Z\-_]+)/g, "#$1"], // ids
     [/\.([a-zA-Z\-_]+)/g, ".$1"], // classes
     [/=([a-zA-Z\-_]+)("(?:\\"|[^"]+)*")/g, "[$1=$2]"], // eq
     [/==([a-zA-Z\-_]+)/g, "[$1]"], // eqeq
-    [/!\((.*?)\)/g, ":not($1)"], // not
-    [/(.*)\+(.*)/, "$1$2"], // plus
-    [/(.*)>(.*)/, "$1>$2"], // single gt
-    [/(.*)>>(.*)/, "$1 $2"], // double gt
 ];
 const mmwsCommentRegex         = mmwsRegexNotInString(/\/\/.*?$|\/\*.*?\*\//sm);
 const mmwsRuleComponent        = /(?<!"(?:\\"|[^"])+);|;(?=[^"]*$)/g;
@@ -109,7 +109,6 @@ function mmwsToCss(code) {
             cssObj[":root"] = [];
         }
         vars = statements.filter(s => s.match(mmwsVariableRegex));
-        console.log(vars);
         vars = vars.map(v => v.replace(mmwsVariableRegex, "--$1: $2;"));
         cssObj[":root"].push(...vars);
     }
@@ -122,8 +121,6 @@ function mmwsToCss(code) {
             resultCSS += `${key}{${cssObj[key].join("")}}`;
         }
     }
-
-    console.log(resultCSS);
 
     return resultCSS
 }
@@ -144,8 +141,8 @@ async function mmwsConvertTagsToCSS() {
                 .map(s => s.replace(
                     new RegExp(
                         `^ {${Math.min(...
-                            [...mmwsCode.matchAll(/^ */gm)]
-                                .map(e => e[0].length).filter(n => n)
+                            [...mmwsCode.matchAll(/^ +(?! *$)/gm)]
+                                .map(e => e[0].length)
                             )}}`,
                         "gm"
                     ), "")
@@ -160,7 +157,6 @@ async function mmwsConvertTagsToCSS() {
             }
             mmwsCode = await response.text();
         }
-        console.log(mmwsCode)
         css = mmwsToCss(mmwsCode);
         if (css !== null) {
             styleEl = document.createElement("style");
