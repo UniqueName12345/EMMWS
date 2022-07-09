@@ -7,15 +7,15 @@ const mmwsStatementRegex       = /^[^ \n][^\n]*$(?!\n {4})/gm;
 const mmwsNameTokenRegex       = /(?::|#|\.|==?)[a-zA-Z\-_]+|(?:\+|>>?)|!\(|\)|"[^"]*"| +/gm;
 const mmwsReplacements         = [
     [mmwsRegexNotInString(/ +/), ""], // whitespace
-    [/([:#\.][a-zA-Z\-_]+)\+([:#\.][a-zA-Z\-_]+)/, "$1$2"], // plus
-    [/([:#\.][a-zA-Z\-_]+)>([:#\.][a-zA-Z\-_]+)/, "$1>$2"], // single gt
-    [/([:#\.][a-zA-Z\-_]+)>>([:#\.][a-zA-Z\-_]+)/, "$1 $2"], // double gt
-    [/!\(([:#\.][a-zA-Z\-_]+)\)/g, ":not($1)"], // not
+    [/([:#.][a-zA-Z\-_]+)\+([:#.][a-zA-Z\-_]+)/, "$1$2"], // plus
+    [/([:#.][a-zA-Z\-_]+)>([:#.][a-zA-Z\-_]+)/, "$1>$2"], // single gt
+    [/([:#.][a-zA-Z\-_]+)>>([:#.][a-zA-Z\-_]+)/, "$1 $2"], // double gt
+    [/!\(([:#.][a-zA-Z\-_]+)\)/g, ":not($1)"], // not
     [/:([a-zA-Z\-_]+)/g, "$1"], // colons
     [/#([a-zA-Z\-_]+)/g, "#$1"], // ids
     [/\.([a-zA-Z\-_]+)/g, ".$1"], // classes
-    [/=([a-zA-Z\-_]+)("(?:\\"|[^"]+)*")/g, "[$1=$2]"], // eq
-    [/==([a-zA-Z\-_]+)/g, "[$1]"], // eqeq
+    [/\=([a-zA-Z\-_]+)("(?:\\"|[^"]+)*")/g, "[$1=$2]"], // eq
+    [/\=\=([a-zA-Z\-_]+)/g, "[$1]"], // eqeq
 ];
 const mmwsCommentRegex         = mmwsRegexNotInString(/\/\/.*?$|\/\*.*?\*\//sm);
 const mmwsRuleComponent        = /(?<!"(?:\\"|[^"])+);|;(?=[^"]*$)/g;
