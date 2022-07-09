@@ -1,4 +1,3 @@
-// this comment is there for testing purposes
 "use strict";
 
 
