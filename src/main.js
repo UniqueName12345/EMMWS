@@ -27,10 +27,10 @@ var   mmwsCounter              = 0;
 
 function mmwsToCss(code) {
     let cssKey, cssObj, i, important,
-        lastValue, key, order, propName, 
-        rep, resultCSS, rule, rules,
-        rulesObj, selector, statements,
-        subc, vars;
+        isVariable, lastValue, key, order,
+        propName, rep, resultCSS, rule,
+        rules, rulesObj, selector,
+        statements, subc, vars;
 
     if (typeof code !== "string") {return;}
 
@@ -67,6 +67,7 @@ function mmwsToCss(code) {
             i = 0;
             important = false;
             lastValue = null;
+            isVariable = false;
             for (subc of rule) {
                 i++;
                 if (i === 1) {
@@ -75,6 +76,10 @@ function mmwsToCss(code) {
                         subc[0] = subc[0].slice(1);
                     }
                     propName = subc[0];
+                    if (propName[0] === "$") {
+                        propName = `--${propName.slice(1)}`;
+                        isVariable = true;
+                    }
                     subc = subc.splice(1);
                     subc = subc.map(s => s.replace(/\$([a-zA-Z\-_]+)/, "var(--$1)"));
                     if (subc.length) {
@@ -82,6 +87,10 @@ function mmwsToCss(code) {
                         lastValue = subc;
                     }
                 } else {
+                    if (isVariable) {
+                        mmwsError("Variable declerations can't have special rules");
+                        return null;
+                    }
                     if (!order.includes(`${cssKey}:${subc[0]}`)) {
                         cssObj[`${cssKey}:${subc[0]}`] = [];
                         order.push(`${cssKey}:${subc[0]}`);
