@@ -1,7 +1,6 @@
 "use strict";
 
 
-// testing
 const mmwsRegexNotInString     = re => new RegExp(`(?<!"(?:\\\\"|[^"])*)(?:${re.source})|(?:${re.source})(?=[^"]*$)`, [...new Set(["g", ...re.flags])].join(""));
 const mmwsRuleRegex            = /^[^ \n][^\n]*(?:\n {4}[^\n]*)(?:\n {4}[^\n]*|\n *)*/gm;
 const mmwsStatementRegex       = /^[^ \n][^\n]*$(?!\n {4})/gm;
