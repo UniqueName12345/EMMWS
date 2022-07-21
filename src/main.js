@@ -1,23 +1,38 @@
 "use strict";
 
 
-const mmwsRegexNotInString     = re => new RegExp(`(?<!"(?:\\\\"|[^"])*)(?:${re.source})|(?:${re.source})(?=[^"]*$)`, [...new Set(["g", ...re.flags])].join(""));
-const mmwsRuleRegex            = /^[^ \n][^\n]*(?:\n {4}[^\n]*)(?:\n {4}[^\n]*|\n *)*/gm;
+const mmwsRegexNotInString     = re => new RegExp(
+    `(?<!"(?:\\\\"|[^"])*)(?:${re.source})|(?:${re.source})(?=[^"]*$)`,
+    [...new Set(["g", ...re.flags])].join("")
+);
+const mmwsRuleRegex            =
+    /^[^ \n][^\n]*(?:\n {4}[^\n]*)(?:\n {4}[^\n]*|\n *)*/gm;
 const mmwsStatementRegex       = /^[^ \n][^\n]*$(?!\n {4})/gm;
-const mmwsNameTokenRegex       = /(?::|#|\.|==?)[a-zA-Z\-_]+|(?:\+|>>?)|!\(|\)|"[^"]*"| +/gm;
+const mmwsNameTokenRegex       =
+    /(?::|#|\.|==?)[a-zA-Z\-_]+|(?:\+|>>?)|!\(|\)|"[^"]*"| +/gm;
+const mmwsWhitespaceRegex      = mmwsRegexNotInString(/ +/);
 const mmwsReplacements         = [
-    [mmwsRegexNotInString(/ +/), ""], // whitespace
-    [/([:#.][a-zA-Z\-_]+)\+([:#.][a-zA-Z\-_]+)/, "$1$2"], // plus
-    [/([:#.][a-zA-Z\-_]+)>([:#.][a-zA-Z\-_]+)/, "$1>$2"], // single gt
-    [/([:#.][a-zA-Z\-_]+)>>([:#.][a-zA-Z\-_]+)/, "$1 $2"], // double gt
-    [/!\(([:#.][a-zA-Z\-_]+)\)/g, ":not($1)"], // not
-    [/:([a-zA-Z\-_]+)/g, "$1"], // colons
-    [/#([a-zA-Z\-_]+)/g, "#$1"], // ids
-    [/\.([a-zA-Z\-_]+)/g, ".$1"], // classes
+    [/([:#.][a-zA-Z\-_]+)\+([:#.][a-zA-Z\-_]+)/g, "$1$2"], // plus
+    [/([:#.][a-zA-Z\-_]+)\>([:#.][a-zA-Z\-_]+)/g, "$1>$2"], // single gt
+    [/([:#.][a-zA-Z\-_]+)\>\>([:#.][a-zA-Z\-_]+)/g, "$1 $2"], // double gt
+    [/!\(([^)]+)\)/g, ":not($1)"], // not
+    [/(?<![a-zA-Z\-_]):([a-zA-Z\-_]+)/g, "$1"], // colons
+    [/(?<![a-zA-Z\-_])#([a-zA-Z\-_]+)/g, "#$1"], // ids
+    [/(?<![a-zA-Z\-_)\.([a-zA-Z\-_]+)/g, ".$1"], // classes
     [/\=([a-zA-Z\-_]+)("(?:\\"|[^"]+)*")/g, "[$1=$2]"], // eq
     [/\=\=([a-zA-Z\-_]+)/g, "[$1]"], // eqeq
-];
-const mmwsCommentRegex         = mmwsRegexNotInString(/\/\/.*?$|\/\*.*?\*\//sm);
+]; // TODO: FIX :html:body
+const mmwsCombinedReplacements = new RegExp(
+    `^(?:${mmwsReplacements.map(re => `(?:${
+        re[0].source
+            .replace(/(?<!\\)\((?!\?=|\?!|\?<=|\?<!|\?:)/g, "(?:")
+    })`).join("|")})+$`, "g"
+);
+const mmwsIsKeyValid           = key => !!(key
+    .replace(/ /g, "")
+    .match(mmwsCombinedReplacements))
+const mmwsCommentRegex         =
+    mmwsRegexNotInString(/\/\/(?:.|\n)*?$|\/\*(?:.|\n)*?\*\//m);
 const mmwsRuleComponent        = /(?<!"(?:\\"|[^"])+);|;(?=[^"]*$)/g;
 const mmwsRuleSubComponent     = /(?<!"(?:\\"|[^"])+) +| +(?=[^"]*$)/g;
 const mmwsVariableRegex        = /\$([a-zA-Z\-_]*) +(.*)/g;
@@ -45,6 +60,10 @@ function mmwsToCss(code) {
     // Create basic results
     rulesObj = {};
     for (rule of rules) {
+        if (!mmwsIsKeyValid(rule[0])) {
+            mmwsError(`Invalid rule: ${rule[0]}`);
+            return null;
+        }
         rulesObj[rule[0]] = rule.splice(1);
     }
 
@@ -53,6 +72,7 @@ function mmwsToCss(code) {
     order = [];
     for (key of Object.keys(rulesObj)) {
         cssKey = key;
+        cssKey = cssKey.replace(mmwsWhitespaceRegex, "");
         for (rep of mmwsReplacements) {
             cssKey = cssKey.replace(rep[0], rep[1]);
         }
@@ -63,7 +83,9 @@ function mmwsToCss(code) {
         cssObj[cssKey] = [];
         for (rule of rulesObj[key]) {
             rule = rule.split(mmwsRuleComponent)
-                .map(s => s.trim().split(mmwsRuleSubComponent).map(s => s.trim()));
+                .map(
+                    s => s.trim().split(mmwsRuleSubComponent).map(s => s.trim())
+                );
             i = 0;
             important = false;
             lastValue = null;
@@ -81,14 +103,22 @@ function mmwsToCss(code) {
                         isVariable = true;
                     }
                     subc = subc.splice(1);
-                    subc = subc.map(s => s.replace(/\$([a-zA-Z\-_]+)/, "var(--$1)"));
+                    subc = subc.map(
+                        s => s.replace(/\$([a-zA-Z\-_]+)/, "var(--$1)")
+                    );
                     if (subc.length) {
-                        cssObj[cssKey].push(`${propName}:${subc.join(" ")}${important ? "!important" : ""};`);
+                        cssObj[cssKey].push(
+                            `${propName}:${subc.join(" ")}${
+                                important ? "!important" : ""
+                            };`
+                        );
                         lastValue = subc;
                     }
                 } else {
                     if (isVariable) {
-                        mmwsError("Variable declerations can't have special rules");
+                        mmwsError(
+                            "Variable declerations can't have special rules"
+                        );
                         return null;
                     }
                     if (!order.includes(`${cssKey}:${subc[0]}`)) {
@@ -98,10 +128,18 @@ function mmwsToCss(code) {
                     }
                     subc = subc.splice(1)
                     if (subc.length) {
-                        cssObj[`${cssKey}:${selector}`].push(`${propName}:${subc.join(" ")}${important ? "!important" : ""};`);
+                        cssObj[`${cssKey}:${selector}`].push(
+                            `${propName}:${subc.join(" ")}${
+                                important ? "!important" : ""
+                            };`
+                        );
                         lastValue = subc;
                     } else if (lastValue !== null) {
-                        cssObj[`${cssKey}:${selector}`].push(`${propName}:${lastValue.join("")}${important ? "!important" : ""};`);
+                        cssObj[`${cssKey}:${selector}`].push(
+                            `${propName}:${lastValue.join("")}${
+                                important ? "!important" : ""
+                            };`
+                        );
                     } else {
                         mmwsError("Declerations can't be empty.");
                         return;
