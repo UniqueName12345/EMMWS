@@ -18,7 +18,7 @@ const mmwsReplacements         = [
     [/!\(([^)]+)\)/g, ":not($1)"], // not
     [/(?<![a-zA-Z\-_]):([a-zA-Z\-_]+)/g, "$1"], // colons
     [/(?<![a-zA-Z\-_])#([a-zA-Z\-_]+)/g, "#$1"], // ids
-    [/(?<![a-zA-Z\-_)\.([a-zA-Z\-_]+)/g, ".$1"], // classes
+    [/(?<![a-zA-Z\-_])\.([a-zA-Z\-_]+)/g, ".$1"], // classes
     [/\=([a-zA-Z\-_]+)("(?:\\"|[^"]+)*")/g, "[$1=$2]"], // eq
     [/\=\=([a-zA-Z\-_]+)/g, "[$1]"], // eqeq
 ];
@@ -72,6 +72,7 @@ function mmwsToCss(code) {
     order = [];
     for (key of Object.keys(rulesObj)) {
         cssKey = key;
+        cssKey = cssKey.replace(mmwsWhitespaceRegex, "");
         for (rep of mmwsReplacements) {
             cssKey = cssKey.replace(rep[0], rep[1]);
         }
