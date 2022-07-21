@@ -21,7 +21,7 @@ const mmwsReplacements         = [
     [/(?<![a-zA-Z\-_)\.([a-zA-Z\-_]+)/g, ".$1"], // classes
     [/\=([a-zA-Z\-_]+)("(?:\\"|[^"]+)*")/g, "[$1=$2]"], // eq
     [/\=\=([a-zA-Z\-_]+)/g, "[$1]"], // eqeq
-]; // TODO: FIX :html:body
+];
 const mmwsCombinedReplacements = new RegExp(
     `^(?:${mmwsReplacements.map(re => `(?:${
         re[0].source
@@ -72,7 +72,6 @@ function mmwsToCss(code) {
     order = [];
     for (key of Object.keys(rulesObj)) {
         cssKey = key;
-        cssKey = cssKey.replace(mmwsWhitespaceRegex, "");
         for (rep of mmwsReplacements) {
             cssKey = cssKey.replace(rep[0], rep[1]);
         }
