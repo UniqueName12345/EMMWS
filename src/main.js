@@ -1,43 +1,46 @@
 "use strict";
 
 
-const mmwsRegexNotInString     = re => new RegExp(
-    `(?<!"(?:\\\\"|[^"])*)(?:${re.source})|(?:${re.source})(?=[^"]*$)`,
-    [...new Set(["g", ...re.flags])].join("")
-);
-const mmwsRuleRegex            =
-    /^[^ \n][^\n]*(?:\n {4}[^\n]*)(?:\n {4}[^\n]*|\n *)*/gm;
-const mmwsStatementRegex       = /^[^ \n][^\n]*$(?!\n {4})/gm;
-const mmwsNameTokenRegex       =
-    /(?::|#|\.|==?)[a-zA-Z\-_]+|(?:\+|>>?)|!\(|\)|"[^"]*"| +/gm;
-const mmwsWhitespaceRegex      = mmwsRegexNotInString(/ +/);
-const mmwsReplacements         = [
-    [/([:#.][a-zA-Z\-_]+)\+([:#.][a-zA-Z\-_]+)/g, "$1$2"], // plus
-    [/([:#.][a-zA-Z\-_]+)\>([:#.][a-zA-Z\-_]+)/g, "$1>$2"], // single gt
-    [/([:#.][a-zA-Z\-_]+)\>\>([:#.][a-zA-Z\-_]+)/g, "$1 $2"], // double gt
-    [/!\(([^)]+)\)/g, ":not($1)"], // not
-    [/(?<![a-zA-Z\-_]):([a-zA-Z\-_]+)/g, "$1"], // colons
-    [/(?<![a-zA-Z\-_])#([a-zA-Z\-_]+)/g, "#$1"], // ids
-    [/(?<![a-zA-Z\-_])\.([a-zA-Z\-_]+)/g, ".$1"], // classes
-    [/\=([a-zA-Z\-_]+)("(?:\\"|[^"]+)*")/g, "[$1=$2]"], // eq
-    [/\=\=([a-zA-Z\-_]+)/g, "[$1]"], // eqeq
-];
-const mmwsCombinedReplacements = new RegExp(
-    `^(?:${mmwsReplacements.map(re => `(?:${
-        re[0].source
-            .replace(/(?<!\\)\((?!\?=|\?!|\?<=|\?<!|\?:)/g, "(?:")
-    })`).join("|")})+$`, "g"
-);
-const mmwsIsKeyValid           = key => !!(key
-    .replace(/ /g, "")
-    .match(mmwsCombinedReplacements))
-const mmwsCommentRegex         =
-    mmwsRegexNotInString(/\/\/(?:.|\n)*?$|\/\*(?:.|\n)*?\*\//m);
-const mmwsRuleComponent        = /(?<!"(?:\\"|[^"])+);|;(?=[^"]*$)/g;
-const mmwsRuleSubComponent     = /(?<!"(?:\\"|[^"])+) +| +(?=[^"]*$)/g;
-const mmwsVariableRegex        = /\$([a-zA-Z\-_]*) +(.*)/g;
-const mmwsError                = console.warn;
-var   mmwsCounter              = 0;
+const mmws = {
+    "regexNotInString":     () => re => new RegExp(
+        `(?<!"(?:\\\\"|[^"])*)(?:${re.source})|(?:${re.source})(?=[^"]*$)`,
+        [...new Set(["g", ...re.flags])].join("")
+    ),
+    "ruleRegex":
+        () => /^[^ \n][^\n]*(?:\n {4}[^\n]*)(?:\n {4}[^\n]*|\n *)*/gm,
+    "statementRegex":       () => /^[^ \n][^\n]*$(?!\n {4})/gm,
+    "nameTokenRegex":
+        () => /(?::|#|\.|==?)[a-zA-Z\-_]+|(?:\+|>>?)|!\(|\)|"[^"]*"| +/gm,
+    "whitespaceRegex":      () => mmws.regexNotInString(/ +/),
+    "replacements":         () => [
+        [/([:#.][a-zA-Z\-_]+)\+([:#.][a-zA-Z\-_]+)/g, "$1$2"], // plus
+        [/([:#.][a-zA-Z\-_]+)\>([:#.][a-zA-Z\-_]+)/g, "$1>$2"], // single gt
+        [/([:#.][a-zA-Z\-_]+)\>\>([:#.][a-zA-Z\-_]+)/g, "$1 $2"], // double gt
+        [/!\(([^)]+)\)/g, ":not($1)"], // not
+        [/(?<![a-zA-Z\-_]):([a-zA-Z\-_]+)/g, "$1"], // colons
+        [/(?<![a-zA-Z\-_])#([a-zA-Z\-_]+)/g, "#$1"], // ids
+        [/(?<![a-zA-Z\-_])\.([a-zA-Z\-_]+)/g, ".$1"], // classes
+        [/\=([a-zA-Z\-_]+)("(?:\\"|[^"]+)*")/g, "[$1=$2]"], // eq
+        [/\=\=([a-zA-Z\-_]+)/g, "[$1]"], // eqeq
+    ],
+    "combinedReplacements": () => new RegExp(
+        `^(?:${mmws.replacements.map(re => `(?:${
+            re[0].source
+                .replace(/(?<!\\)\((?!\?=|\?!|\?<=|\?<!|\?:)/g, "(?:")
+        })`).join("|")})+$`, "g"
+    ),
+    "isValidKey":           () => key => !!(key
+        .replace(/ /g, "")
+        .match(mmws.combinedReplacements)),
+    "commentRegex":
+        () => mmws.regexNotInString(/\/\/(?:.|\n)*?$|\/\*(?:.|\n)*?\*\//m),
+    "ruleComponent":        () => /(?<!"(?:\\"|[^"])+);|;(?=[^"]*$)/g,
+    "ruleSubComponent":     () => /(?<!"(?:\\"|[^"])+) +| +(?=[^"]*$)/g,
+    "variableRegex":        () => /\$([a-zA-Z\-_]*) +(.*)/g,
+    "error":                () => console.warn,
+    "counter":              () => 0,
+};
+Object.keys(mmws).forEach(k => mmws[k] = mmws[k]());
 
 
 function mmwsToCss(code) {
@@ -50,18 +53,18 @@ function mmwsToCss(code) {
     if (typeof code !== "string") {return;}
 
     // Get important parts from the code
-    code = code.replace(mmwsCommentRegex, "");
-    rules = [...code.matchAll(mmwsRuleRegex)]
+    code = code.replace(mmws.commentRegex, "");
+    rules = [...code.matchAll(mmws.ruleRegex)]
         .map(r => r.toString().trim().split("\n")
             .map(s => s.trim()));
-    statements = [...code.matchAll(mmwsStatementRegex)]
+    statements = [...code.matchAll(mmws.statementRegex)]
         .map(r => r.toString());
 
     // Create basic results
     rulesObj = {};
     for (rule of rules) {
-        if (!mmwsIsKeyValid(rule[0])) {
-            mmwsError(`Invalid rule: ${rule[0]}`);
+        if (!mmws.isValidKey(rule[0])) {
+            mmws.error(`Invalid rule: ${rule[0]}`);
             return null;
         }
         rulesObj[rule[0]] = rule.splice(1);
@@ -72,8 +75,8 @@ function mmwsToCss(code) {
     order = [];
     for (key of Object.keys(rulesObj)) {
         cssKey = key;
-        cssKey = cssKey.replace(mmwsWhitespaceRegex, "");
-        for (rep of mmwsReplacements) {
+        cssKey = cssKey.replace(mmws.whitespaceRegex, "");
+        for (rep of mmws.replacements) {
             cssKey = cssKey.replace(rep[0], rep[1]);
         }
         if (cssKey === "html") {
@@ -82,9 +85,9 @@ function mmwsToCss(code) {
         order.push(cssKey);
         cssObj[cssKey] = [];
         for (rule of rulesObj[key]) {
-            rule = rule.split(mmwsRuleComponent)
+            rule = rule.split(mmws.ruleComponent)
                 .map(
-                    s => s.trim().split(mmwsRuleSubComponent).map(s => s.trim())
+                    s => s.trim().split(mmws.ruleSubComponent).map(s => s.trim())
                 );
             i = 0;
             important = false;
@@ -116,7 +119,7 @@ function mmwsToCss(code) {
                     }
                 } else {
                     if (isVariable) {
-                        mmwsError(
+                        mmws.error(
                             "Variable declerations can't have special rules"
                         );
                         return null;
@@ -141,7 +144,7 @@ function mmwsToCss(code) {
                             };`
                         );
                     } else {
-                        mmwsError("Declerations can't be empty.");
+                        mmws.error("Declerations can't be empty.");
                         return;
                     }
                 }
@@ -155,8 +158,8 @@ function mmwsToCss(code) {
             order = [":root", ...order];
             cssObj[":root"] = [];
         }
-        vars = statements.filter(s => s.match(mmwsVariableRegex));
-        vars = vars.map(v => v.replace(mmwsVariableRegex, "--$1: $2;"));
+        vars = statements.filter(s => s.match(mmws.variableRegex));
+        vars = vars.map(v => v.replace(mmws.variableRegex, "--$1: $2;"));
         cssObj[":root"].push(...vars);
     }
     
@@ -173,7 +176,7 @@ function mmwsToCss(code) {
 }
 
 
-async function mmwsConvertTagsToCSS() {
+async function mmwsConvertTagsToCss() {
     let element, fileName, mmwsCode,
         response, css, styleEl;
 
@@ -194,12 +197,12 @@ async function mmwsConvertTagsToCSS() {
                         "gm"
                     ), "")
                 ).join("\n");
-            mmwsCounter++;
-            fileName = `inline-${mmwsCounter}`;
+            mmws.counter++;
+            fileName = `inline-${mmws.counter}`;
         } else {
             response = await fetch(fileName);
             if (response.status === 404) {
-                mmwsError(`${fileName} does not exist.`);
+                mmws.error(`${fileName} does not exist.`);
                 continue;
             }
             mmwsCode = await response.text();
@@ -217,4 +220,4 @@ async function mmwsConvertTagsToCSS() {
 }
 
 
-mmwsConvertTagsToCSS();
+mmwsConvertTagsToCss();
