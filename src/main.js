@@ -10,18 +10,18 @@ const mmws = {
         () => /^[^ \n][^\n]*(?:\n {4}[^\n]*)(?:\n {4}[^\n]*|\n *)*/gm,
     "statementRegex":       () => /^[^ \n][^\n]*$(?!\n {4})/gm,
     "nameTokenRegex":
-        () => /(?::|#|\.|==?)[a-zA-Z\-_]+|(?:\+|>>?)|!\(|\)|"[^"]*"| +/gm,
+        () => /(?::|#|\.|==?)[a-zA-Z\-_0-9]+|(?:\+|>>?)|!\(|\)|"[^"]*"| +/gm,
     "whitespaceRegex":      () => mmws.regexNotInString(/ +/),
     "replacements":         () => [
-        [/([:#.][a-zA-Z\-_]+)\+([:#.][a-zA-Z\-_]+)/g, "$1$2"], // plus
-        [/([:#.][a-zA-Z\-_]+)\>([:#.][a-zA-Z\-_]+)/g, "$1>$2"], // single gt
-        [/([:#.][a-zA-Z\-_]+)\>\>([:#.][a-zA-Z\-_]+)/g, "$1 $2"], // double gt
+        [/([:#.][a-zA-Z\-_0-9]+)\+([:#.][a-zA-Z\-_0-9]+)/g, "$1$2"], // plus
+        [/([:#.][a-zA-Z\-_0-9]+)\>([:#.][a-zA-Z\-_0-9]+)/g, "$1>$2"], // single gt
+        [/([:#.][a-zA-Z\-_0-9]+)\>\>([:#.][a-zA-Z\-_0-9]+)/g, "$1 $2"], // double gt
         [/!\(([^)]+)\)/g, ":not($1)"], // not
-        [/(?<![a-zA-Z\-_]):([a-zA-Z\-_]+)/g, "$1"], // colons
-        [/(?<![a-zA-Z\-_])#([a-zA-Z\-_]+)/g, "#$1"], // ids
-        [/(?<![a-zA-Z\-_])\.([a-zA-Z\-_]+)/g, ".$1"], // classes
-        [/\=([a-zA-Z\-_]+)("(?:\\"|[^"]+)*")/g, "[$1=$2]"], // eq
-        [/\=\=([a-zA-Z\-_]+)/g, "[$1]"], // eqeq
+        [/(?<![a-zA-Z\-_0-9]):([a-zA-Z\-_0-9]+)/g, "$1"], // colons
+        [/(?<![a-zA-Z\-_0-9])#([a-zA-Z\-_0-9]+)/g, "#$1"], // ids
+        [/(?<![a-zA-Z\-_0-9])\.([a-zA-Z\-_0-9]+)/g, ".$1"], // classes
+        [/\=([a-zA-Z\-_0-9]+)("(?:\\"|[^"]+)*")/g, "[$1=$2]"], // eq
+        [/\=\=([a-zA-Z\-_0-9]+)/g, "[$1]"], // eqeq
     ],
     "combinedReplacements": () => new RegExp(
         `^(?:${mmws.replacements.map(re => `(?:${
@@ -36,14 +36,15 @@ const mmws = {
         () => mmws.regexNotInString(/\/\/(?:.|\n)*?$|\/\*(?:.|\n)*?\*\//m),
     "ruleComponent":        () => /(?<!"(?:\\"|[^"])+);|;(?=[^"]*$)/g,
     "ruleSubComponent":     () => /(?<!"(?:\\"|[^"])+) +| +(?=[^"]*$)/g,
-    "variableRegex":        () => /\$([a-zA-Z\-_]*) +(.*)/g,
+    "variableRegex":        () => /\$([a-zA-Z\-_0-9]*) +(.*)/g,
     "error":                () => console.warn,
-    "counter":              () => 0,
+    "embeddedCounter":      () => 0,
+    "inlineMMWSCounter":    () => 0,
 };
 Object.keys(mmws).forEach(k => mmws[k] = mmws[k]());
 
 
-function mmwsToCss(code) {
+function mmwsToCSS(code) {
     let cssKey, cssObj, i, important,
         isVariable, lastValue, key, order,
         propName, rep, resultCSS, rule,
@@ -107,7 +108,7 @@ function mmwsToCss(code) {
                     }
                     subc = subc.splice(1);
                     subc = subc.map(
-                        s => s.replace(/\$([a-zA-Z\-_]+)/, "var(--$1)")
+                        s => s.replace(/\$([a-zA-Z\-_0-9]+)/, "var(--$1)")
                     );
                     if (subc.length) {
                         cssObj[cssKey].push(
@@ -176,9 +177,10 @@ function mmwsToCss(code) {
 }
 
 
-async function mmwsConvertTagsToCss() {
-    let element, fileName, mmwsCode,
-        response, css, styleEl;
+async function mmwsConvertTagsToCSS() {
+    let cssCode, element, fileName,
+        inlineCode, mmwsCode, response,
+        styleEl;
 
     for (element of document.querySelectorAll("mmws")) {
         fileName = element.getAttribute("src");
@@ -197,8 +199,8 @@ async function mmwsConvertTagsToCss() {
                         "gm"
                     ), "")
                 ).join("\n");
-            mmws.counter++;
-            fileName = `inline-${mmws.counter}`;
+            mmws.embeddedCounter++;
+            fileName = `embedded-${mmws.embeddedCounter}`;
         } else {
             response = await fetch(fileName);
             if (response.status === 404) {
@@ -207,17 +209,43 @@ async function mmwsConvertTagsToCss() {
             }
             mmwsCode = await response.text();
         }
-        css = mmwsToCss(mmwsCode);
-        if (css !== null) {
+        cssCode = mmwsToCSS(mmwsCode);
+        if (cssCode !== null) {
             styleEl = document.createElement("style");
-            styleEl.classList.add("-mmws-converted");
+            styleEl.classList.add("--mmws");
             styleEl.id = `--mmws-from-${fileName.replace(/[^A-Z0-9-]/ig, "-")}`;
-            styleEl.innerHTML = css;
+            styleEl.innerHTML = cssCode;
             document.head.appendChild(styleEl);
         }
-    element.remove();
+        element.remove();
+    }
+
+    inlineCode = "";
+    for (element of document.querySelectorAll("[mmws]")) {
+        if (!element.id) {
+            mmws.inlineMMWSCounter++;
+            element.id = `--mmws-inline-${mmws.inlineMMWSCounter}`;
+        }
+        mmwsCode = element.getAttribute("mmws");
+        mmwsCode = mmwsCode
+            .split(mmws.regexNotInString(/\|/))
+            .map(s => s.trim())
+            .map(s => `    ${s}`)
+            .join("\n");
+        mmwsCode = `#${element.id}\n${mmwsCode}`;
+        cssCode = mmwsToCSS(mmwsCode);
+        inlineCode += cssCode;
+        console.log(mmwsCode);
+        console.log(cssCode);
+    }
+    if (inlineCode) {
+        styleEl = document.createElement("style");
+        styleEl.classList.add("--mmws");
+        styleEl.id = `--mmws-from-inline`;
+        styleEl.innerHTML = cssCode;
+        document.head.appendChild(styleEl);
     }
 }
 
 
-mmwsConvertTagsToCss();
+mmwsConvertTagsToCSS();
